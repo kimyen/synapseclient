@@ -10,7 +10,7 @@ rm -rf ../RLIB
 mkdir -p ../RLIB
 
 PACKAGE_NAME=synapser
-PACKAGE_VERSION=`grep Version DESCRIPTION | awk '{print $2}'`
+PACKAGE_VERSION=`grep Version DESCRIPTION | awk '{print $2}'`.${BUILD_NUMBER}
 
 # store the login credentials
 echo "[authentication]" > orig.synapseConfig
