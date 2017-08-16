@@ -20,7 +20,7 @@ then
 	mv DESCRIPTION.temp DESCRIPTION
 fi
 
-PACKAGE_VERSION=`grep Version DESCRIPTION | awk '{print $2}'`
+export PACKAGE_VERSION=`grep Version DESCRIPTION | awk '{print $2}'`
 
 # store the login credentials
 echo "[authentication]" > orig.synapseConfig
