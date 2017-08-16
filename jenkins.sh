@@ -11,7 +11,7 @@ mkdir -p ../RLIB
 
 PACKAGE_NAME=synapser
 
-if [[ ${DEV_VERSION} ]] 
+if [ -n ${DEV_VERSION} ] 
 then
 	VERSION_LINE=`grep Version DESCRIPTION`
 	DEV_VERSION_LINE=$VERSION_LINE.$DEV_VERSION
