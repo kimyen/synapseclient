@@ -11,6 +11,8 @@ mkdir -p ../RLIB
 
 PACKAGE_NAME=synapser
 
+# if version is specified, build the given version
+
 if [ -n ${VERSION} ] 
 then
 	VERSION_LINE=`grep Version DESCRIPTION`
