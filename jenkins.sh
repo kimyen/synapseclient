@@ -9,6 +9,13 @@
 rm -rf ../RLIB
 mkdir -p ../RLIB
 
+##
+## install the dependencies, first making sure there are none in the default path
+##
+R -e "try(remove.packages('synapser'), silent=T);\
+try(remove.packages('PythonEmbedInR'), silent=T);\
+install.packages(c('pack', 'R6', 'testthat', 'knitr', 'rmarkdown', 'PythonEmbedInR'), repos=c('https://cran.cnr.berkeley.edu', 'https://sage-bionetworks.github.io/ran'))"
+
 PACKAGE_NAME=synapser
 
 # if version is specified, build the given version
@@ -36,10 +43,13 @@ if [ $label = ubuntu ] || [ $label = ubuntu-remote ]; then
   ## build the package, including the vignettes
   R CMD build ./
 
-  ## now install it
-  R CMD INSTALL ./ --library=../RLIB --no-test-load
+  ## now install it, creating the deployable archive as a side effect
+  ## TODO I removed --no-test-load from the end of the next line.  Is that OK?
+  R CMD INSTALL ./ --library=../RLIB
   
-  if [ ! -f  ${PACKAGE_NAME}_${PACKAGE_VERSION}.tar.gz ]; then
+  CREATED_ARCHIVE=${PACKAGE_NAME}_${PACKAGE_VERSION}.tar.gz
+  
+  if [ ! -f ${CREATED_ARCHIVE} ]; then
   	echo "Linux artifact was not created"
   	exit 1
   fi
@@ -51,14 +61,13 @@ elif [ $label = osx ] || [ $label = osx-lion ] || [ $label = osx-leopard ]; then
   # make sure there are no stray .tar.gz files
   rm -f ${PACKAGE_NAME}*.tar.gz
   rm -f ${PACKAGE_NAME}*.tgz
+  
   R CMD build ./
   # now there should be exactly one *.tar.gz file
 
   ## build the binary for MacOS
-  for f in ${PACKAGE_NAME}*.tar.gz
-  do
-     R CMD INSTALL --build "$f" --library=../RLIB --no-test-load
-  done
+  ## TODO I removed --no-test-load from the end of the next line.  Is that OK?
+  R CMD INSTALL --build ${PACKAGE_NAME}_${PACKAGE_VERSION}.tar.gz --library=../RLIB
 
   if [ -f ../RLIB/${PACKAGE_NAME}/libs/${PACKAGE_NAME}.so ]; then
     ## Now fix the binaries, per SYNR-341:
@@ -84,7 +93,9 @@ elif [ $label = osx ] || [ $label = osx-lion ] || [ $label = osx-leopard ]; then
   rm ${PACKAGE_NAME}*.tar.gz
   set -e
     
-  if [ ! -f  ${PACKAGE_NAME}_${PACKAGE_VERSION}.tgz ]; then
+  CREATED_ARCHIVE=${PACKAGE_NAME}_${PACKAGE_VERSION}.tgz
+
+  if [ ! -f  ${CREATED_ARCHIVE} ]; then
   	echo "osx artifact was not created"
   	exit 1
   fi
@@ -107,10 +118,8 @@ elif  [ $label = windows-aws ]; then
   # now there should be exactly one *.tar.gz file
 
   ## build the binary for Windows
-  for f in ${PACKAGE_NAME}*.tar.gz
-  do
-     R CMD INSTALL --build "$f" --library=../RLIB --no-test-load
-  done
+  ## TODO I removed --no-test-load from the end of the next line.  Is that OK?
+  R CMD INSTALL --build ${PACKAGE_NAME}_${PACKAGE_VERSION}.tar.gz --library=../RLIB
   
   # for some reason Windows fails to create synapser_<version>.zip
   ZIP_TARGET_NAME=${PACKAGE_NAME}_${PACKAGE_VERSION}.zip
@@ -127,7 +136,9 @@ elif  [ $label = windows-aws ]; then
   ## the ones created on the unix machine.
   rm -f ${PACKAGE_NAME}*.tar.gz
   
-  if [ ! -f  ${PACKAGE_NAME}_${PACKAGE_VERSION}.zip ]; then
+  CREATED_ARCHIVE=${ZIP_TARGET_NAME}
+
+  if [ ! -f  ${CREATED_ARCHIVE} ]; then
   	echo "Windows artifact was not created"
   	exit 1
   fi
@@ -138,3 +149,17 @@ fi
 
 ## clean up the temporary R library dir
 rm -rf ../RLIB
+
+# Need to verify that we didn't accidentally install Python modules in
+# PythonEmbedInR.  To do this we reinstall the dependency then try to load
+# up the recently created synapser package
+R -e "try(remove.packages('PythonEmbedInR'), silent=T);\
+try(remove.packages('synapser'), silent=T);\
+install.packages('PythonEmbedInR',repos=c('https://cran.cnr.berkeley.edu', 'https://sage-bionetworks.github.io/ran'))"
+
+R CMD INSTALL ${CREATED_ARCHIVE}
+
+R -e "library(synapser)"
+
+
+
