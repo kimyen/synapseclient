@@ -9,8 +9,44 @@
 rm -rf ../RLIB
 mkdir -p ../RLIB
 
+##
+## install the dependencies, first making sure there are none in the default path
+##
+if [ ${USE_STAGING_RAN} ]
+then
+	RAN=https://sage-bionetworks.github.io/staging-ran
+else
+	RAN=https://sage-bionetworks.github.io/ran
+fi
+
+R -e "try(remove.packages('synapser'), silent=T);\
+try(remove.packages('PythonEmbedInR'), silent=T);\
+install.packages(c('pack', 'R6', 'testthat', 'knitr', 'rmarkdown', 'PythonEmbedInR'), repos=c('http://cran.cnr.berkeley.edu', '${RAN}'))"
+
 PACKAGE_NAME=synapser
-PACKAGE_VERSION=`grep Version DESCRIPTION | awk '{print $2}'`
+
+# if version is specified, build the given version
+if [ -n ${VERSION} ] 
+then
+  DATE=`date +%Y-%m-%d`
+  # replace DESCRIPTION with $VERSION & $DATE
+  sed "s|^Version: .*$|Version: $VERSION|g" DESCRIPTION > DESCRIPTION.temp
+  sed "s|^Date: .*$|Date: $DATE|g" DESCRIPTION.temp > DESCRIPTION2.temp
+
+  rm DESCRIPTION
+  mv DESCRIPTION2.temp DESCRIPTION
+  rm DESCRIPTION.temp
+
+  # replace man/synapser-package.Rd with $VERSION & $DATE
+  sed "s|^Version: .*$|Version: \\\tab $VERSION\\\cr|g" man/synapser-package.Rd > man/synapser-package.Rd.temp
+  sed "s|^Date: .*$|Date: \\\tab $DATE\\\cr|g" man/synapser-package.Rd.temp > man/synapser-package.Rd2.temp
+
+  rm man/synapser-package.Rd
+  mv man/synapser-package.Rd2.temp man/synapser-package.Rd
+  rm man/synapser-package.Rd.temp
+fi
+
+export PACKAGE_VERSION=`grep Version DESCRIPTION | awk '{print $2}'`
 
 # store the login credentials
 echo "[authentication]" > orig.synapseConfig
@@ -24,10 +60,12 @@ if [ $label = ubuntu ] || [ $label = ubuntu-remote ]; then
   ## build the package, including the vignettes
   R CMD build ./
 
-  ## now install it
-  R CMD INSTALL ./ --library=../RLIB --no-test-load
+  ## now install it, creating the deployable archive as a side effect
+  R CMD INSTALL ./ --library=../RLIB
   
-  if [ ! -f  ${PACKAGE_NAME}_${PACKAGE_VERSION}.tar.gz ]; then
+  CREATED_ARCHIVE=${PACKAGE_NAME}_${PACKAGE_VERSION}.tar.gz
+  
+  if [ ! -f ${CREATED_ARCHIVE} ]; then
   	echo "Linux artifact was not created"
   	exit 1
   fi
@@ -39,14 +77,12 @@ elif [ $label = osx ] || [ $label = osx-lion ] || [ $label = osx-leopard ]; then
   # make sure there are no stray .tar.gz files
   rm -f ${PACKAGE_NAME}*.tar.gz
   rm -f ${PACKAGE_NAME}*.tgz
+  
   R CMD build ./
   # now there should be exactly one *.tar.gz file
 
   ## build the binary for MacOS
-  for f in ${PACKAGE_NAME}*.tar.gz
-  do
-     R CMD INSTALL --build "$f" --library=../RLIB --no-test-load
-  done
+  R CMD INSTALL --build ${PACKAGE_NAME}_${PACKAGE_VERSION}.tar.gz --library=../RLIB
 
   if [ -f ../RLIB/${PACKAGE_NAME}/libs/${PACKAGE_NAME}.so ]; then
     ## Now fix the binaries, per SYNR-341:
@@ -72,13 +108,15 @@ elif [ $label = osx ] || [ $label = osx-lion ] || [ $label = osx-leopard ]; then
   rm ${PACKAGE_NAME}*.tar.gz
   set -e
     
-  if [ ! -f  ${PACKAGE_NAME}_${PACKAGE_VERSION}.tgz ]; then
+  CREATED_ARCHIVE=${PACKAGE_NAME}_${PACKAGE_VERSION}.tgz
+
+  if [ ! -f  ${CREATED_ARCHIVE} ]; then
   	echo "osx artifact was not created"
   	exit 1
   fi
 elif  [ $label = windows-aws ]; then
-  # for some reason "~" is not recognized.  As a workaround we "hard code" /Users/Administrator
-  mv orig.synapseConfig /home/Administrator/.synapseConfig
+  # for some reason "~" is not recognized.  As a workaround we "hard code" /c/Users/Administrator
+  mv orig.synapseConfig /c/Users/Administrator/.synapseConfig
   export TZ=UTC
 
   ## build the package, including the vignettes
@@ -95,10 +133,8 @@ elif  [ $label = windows-aws ]; then
   # now there should be exactly one *.tar.gz file
 
   ## build the binary for Windows
-  for f in ${PACKAGE_NAME}*.tar.gz
-  do
-     R CMD INSTALL --build "$f" --library=../RLIB --no-test-load
-  done
+  # omitting "--no-test-load" causes the error: "Error : package 'PythonEmbedInR' is not installed for 'arch = i386'"
+  R CMD INSTALL --build ${PACKAGE_NAME}_${PACKAGE_VERSION}.tar.gz --library=../RLIB --no-test-load
   
   # for some reason Windows fails to create synapser_<version>.zip
   ZIP_TARGET_NAME=${PACKAGE_NAME}_${PACKAGE_VERSION}.zip
@@ -115,7 +151,9 @@ elif  [ $label = windows-aws ]; then
   ## the ones created on the unix machine.
   rm -f ${PACKAGE_NAME}*.tar.gz
   
-  if [ ! -f  ${PACKAGE_NAME}_${PACKAGE_VERSION}.zip ]; then
+  CREATED_ARCHIVE=${ZIP_TARGET_NAME}
+
+  if [ ! -f  ${CREATED_ARCHIVE} ]; then
   	echo "Windows artifact was not created"
   	exit 1
   fi
@@ -124,5 +162,10 @@ else
   exit 1
 fi
 
+R -e ".libPaths('../RLIB');\
+  setwd(sprintf('%s/tests', getwd()));\
+  source('testthat.R')"
+
 ## clean up the temporary R library dir
 rm -rf ../RLIB
+

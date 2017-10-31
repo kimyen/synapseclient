@@ -9,10 +9,12 @@
 	.defineRPackageFunctions()
 	
 	pyImport("synapseclient")
+	pySet("synapserVersion", sprintf("synapser/%s ", packageVersion("synapser")))
+	pyExec("synapseclient.USER_AGENT['User-Agent'] = synapserVersion + synapseclient.USER_AGENT['User-Agent']")
 	pyExec("syn=synapseclient.Synapse()")
 }
 
-determineArgsAndKwArgs<-function(...) {
+.determineArgsAndKwArgs<-function(...) {
 	values<-list(...)
 	valuenames<-names(values)
 	n<-length(values)
@@ -38,14 +40,16 @@ determineArgsAndKwArgs<-function(...) {
 	list(args=args, kwargs=kwargs)
 }
 
-.defineFunction<-function(synName, pyName) {
+.defineFunction<-function(synName, pyName, functionContainerName) {
 	force(synName)
 	force(pyName)
+	force(functionContainerName)
 	assign(sprintf(".%s", synName), function(...) {
-				syn<-pyGet("syn", simplify=FALSE)
-				argsAndKwArgs<-determineArgsAndKwArgs(...)
-				functionAndArgs<-append(list(syn, pyName), argsAndKwArgs$args)
-				pyCall("gateway.invoke", args=functionAndArgs, kwargs=argsAndKwArgs$kwargs, simplify=F)
+				functionContainer<-pyGet(functionContainerName, simplify=FALSE)
+				argsAndKwArgs<-.determineArgsAndKwArgs(...)
+				functionAndArgs<-append(list(functionContainer, pyName), argsAndKwArgs$args)
+				returnedObject <- pyCall("gateway.invoke", args=functionAndArgs, kwargs=argsAndKwArgs$kwargs, simplify=F)
+				.modify(returnedObject)
 			})
 	setGeneric(
 			name=synName,
@@ -60,7 +64,7 @@ determineArgsAndKwArgs<-function(...) {
 	force(pyName)
 	assign(sprintf(".%s", synName), function(...) {
 				synapseClientModule<-pyGet("synapseclient")
-				argsAndKwArgs<-determineArgsAndKwArgs(...)
+				argsAndKwArgs<-.determineArgsAndKwArgs(...)
 				functionAndArgs<-append(list(synapseClientModule, pyName), argsAndKwArgs$args)
 				pyCall("gateway.invoke", args=functionAndArgs, kwargs=argsAndKwArgs$kwargs, simplify=F)
 			})
@@ -75,12 +79,24 @@ determineArgsAndKwArgs<-function(...) {
 .defineRPackageFunctions<-function() {
 	functionInfo<-.getSynapseFunctionInfo(system.file(package="synapser"))
 	for (f in functionInfo) {
-		.defineFunction(f$synName, f$name)
+		.defineFunction(f$synName, f$name, f$functionContainerName)
 	}
 	classInfo<-.getSynapseClassInfo(system.file(package="synapser"))
 	for (c in classInfo) {
 		.defineConstructor(c$name, c$name)
 	}
+}
+
+.modify <- function(object) {
+  if (is(object, "CsvFileTable")){
+    # reading from csv
+    unlockBinding("asDataFrame", object)
+    object$asDataFrame <- function() {
+      readCsv(object$filepath)
+    }
+    lockBinding("asDataFrame", object)
+  }
+  object
 }
 
 .onAttach <- function(libname, pkgname) {

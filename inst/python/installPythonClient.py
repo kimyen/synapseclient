@@ -25,9 +25,15 @@ def localSitePackageFolder(root):
         return root+os.sep+"lib"+os.sep+"python3.5"+os.sep+"site-packages"
     
 def addLocalSitePackageToPythonPath(root):
-    # PYTHONPATH sets the search path for importing python modules
+    # clean up sys.path to ensure that synapser does not use user's installed packages
+    sys.path = [x for x in sys.path if x.startswith(root) or "PythonEmbedInR" in x]
+
     sitePackages = localSitePackageFolder(root)
-    os.environ['PYTHONPATH'] = sitePackages
+    # PYTHONPATH sets the search path for importing python modules
+    if os.environ.get('PYTHONPATH') is not None:
+      os.environ['PYTHONPATH'] += os.pathsep+sitePackages
+    else:
+      os.environ['PYTHONPATH'] = os.pathsep+sitePackages
     sys.path.append(sitePackages)
     # modules with .egg extensions (such as future and synapseClient) need to be explicitly added to the sys.path
     for eggpath in glob.glob(sitePackages+os.sep+'*.egg'):
@@ -46,21 +52,76 @@ def main(path):
     
     # The preferred approach to install a package is to use pip...
     # stdouterrCapture(lambda: call_pip('pip')) # (can even use pip to update pip itself)
-    stdouterrCapture(lambda: call_pip('pandas'))
-    
+    stdouterrCapture(lambda: call_pip('pandas', localSitePackages), abbreviateStackTrace=False)
+#     # check that the installation worked
+#    addLocalSitePackageToPythonPath(moduleInstallationPrefix)
+#     import pandas# This fails intermittently
+
     # ...but - for some reason - pip breaks when we install the python synapse client
     # So we use 'setup' directly
     packageName = "synapseclient-1.7.2"
     linkPrefix = "https://pypi.python.org/packages/67/30/9b1dd943be460368c1ab5babe17a9036425b97fd510451347c500966e56c/"
     installPackage(packageName, linkPrefix, path, moduleInstallationPrefix)
-        
-def call_pip(packageName):
-        rc = pip.main(['install', packageName,  '--upgrade', '--quiet'])
+    # check that the installation worked
+    addLocalSitePackageToPythonPath(moduleInstallationPrefix)
+    import synapseclient
+    
+    # When trying to 'synStore' a table we get the error:
+    # pandas.Styler requires jinja2. Please install with `conda install Jinja2`
+    # So let's install Jinja2 here:
+    # https://stackoverflow.com/questions/43163201/pyinstaller-syntax-error-yield-inside-async-function-python-3-5-1
+
+    # Jinja2 depends on MarkupSafe
+    packageName = "MarkupSafe-1.0"
+    linkPrefix = "https://pypi.python.org/packages/4d/de/32d741db316d8fdb7680822dd37001ef7a448255de9699ab4bfcbdf4172b/"
+    installedPackageFolderName="markupsafe"
+    simplePackageInstall(packageName, installedPackageFolderName, linkPrefix, path, localSitePackages)
+    addLocalSitePackageToPythonPath(moduleInstallationPrefix)
+    #import markupsafe  # This fails intermittently
+
+    packageName = "Jinja2-2.8.1"
+    linkPrefix = "https://pypi.python.org/packages/5f/bd/5815d4d925a2b8cbbb4b4960f018441b0c65f24ba29f3bdcfb3c8218a307/"
+    installedPackageFolderName="jinja2"
+    simplePackageInstall(packageName, installedPackageFolderName, linkPrefix, path, localSitePackages)
+    addLocalSitePackageToPythonPath(moduleInstallationPrefix)
+    #import jinja2 # This fails intermittently
+
+# pip installs in the wrong place (ends up being in the PythonEmbedInR package rather than this one)
+def call_pip(packageName, target):
+        rc = pip.main(['install', packageName,  '--upgrade', '--quiet', '--target', target])
         if rc!=0:
             raise Exception('pip.main returned '+str(rc))
 
-            
-def installPackage(packageName, linkPrefix, path, moduleInstallationPrefix):
+    
+# unzip directly into localSitePackages/installedPackageFolderName
+# This is a workaround for the cases in which 'pip' and 'setup.py' fail.
+# (They fail for MarkupSafe and Jinja2, without providing any info about what went wrong.)
+def simplePackageInstall(packageName, installedPackageFolderName, linkPrefix, path, localSitePackages):
+    # download 
+    zipFileName = packageName + ".tar.gz"
+    localZipFile = path+os.sep+zipFileName
+    x = urllib.request.urlopen(linkPrefix+zipFileName)
+    saveFile = open(localZipFile,'wb')
+    saveFile.write(x.read())
+    saveFile.close()
+    
+    tar = tarfile.open(localZipFile)
+    tar.extractall(path=path)
+    tar.close()
+    os.remove(localZipFile)
+
+    packageDir = path+os.sep+packageName
+    os.chdir(packageDir)
+    
+    # inside 'packageDir' there's a folder to move to localSitePackages
+    shutil.move(packageDir+os.sep+installedPackageFolderName, localSitePackages)
+        
+    os.chdir(path)
+    shutil.rmtree(packageDir)
+    
+    sys.path.append(localSitePackages+os.sep+installedPackageFolderName)
+
+def installPackage(packageName, linkPrefix, path, moduleInstallationPrefix, redirectOutput=True):
     # download 
     zipFileName = packageName + ".tar.gz"
     localZipFile = path+os.sep+zipFileName
@@ -76,46 +137,21 @@ def installPackage(packageName, linkPrefix, path, moduleInstallationPrefix):
         
     packageDir = path+os.sep+packageName
     os.chdir(packageDir)
-
-    origStdout=sys.stdout
-    origStderr=sys.stderr 
-    outfile=tempfile.mkstemp()
-    outfilehandle=outfile[0]
-    outfilepath=outfile[1]
-    outfilehandle = open(outfilepath, 'w', encoding="utf-8")
-    sys.stdout = outfilehandle
-    sys.stderr = outfilehandle
     
     orig_sys_path = sys.path
     orig_sys_argv = sys.argv
     sys.path = ['.'] + sys.path
     sys.argv = ['setup.py', 'install', '--prefix='+moduleInstallationPrefix]
-        
+
     try:
-        importlib.import_module("setup") 
-        #import setup
-        
-    except SystemExit:
-        print('caught SystemExit while setting up package '+packageName+'  sys.exc_info:'+repr(sys.exc_info()[1]))
-        
-    except Exception as e:
-        print('caught Exception while setting up package '+packageNam+ ' '+str(e))
-        
+        if redirectOutput:
+            stdouterrCapture(lambda: importlib.import_module("setup"), abbreviateStackTrace=False)
+        else:
+            importlib.import_module("setup")
     finally:
         sys.path=orig_sys_path
         sys.argv=orig_sys_argv
-        sys.stdout=origStdout
-        sys.stderr=origStderr
-        try:
-            outfilehandle.flush()
-            outfilehandle.close()
-        except:
-            pass # nothing to do
-        with open(outfilepath, 'r') as f:
-            print(f.read())
- 
         # leave the folder we're about to delete
         os.chdir(path)
         shutil.rmtree(packageDir)
-
 
