@@ -1,5 +1,5 @@
 
-<!-- README.md is generated from README.Rmd. -->
+<!-- README.md is generated from README.Rmd. Please modify README.Rmd and run `rmarkdown::render("README.Rmd")` to update README.md -->
 synapser
 ========
 
@@ -17,19 +17,27 @@ Installation
 `synapser` is available as a ready-built package. It can be installed or upgraded using the standard `install.packages()` command, adding the Sage Bionetworks repository to the repo list, e.g.:
 
 ``` r
-install.packages("synapser", repos=c("https://sage-bionetworks.github.io/ran", "https://cran.cnr.berkeley.edu/"))
+install.packages("synapser", repos=c("https://sage-bionetworks.github.io/ran", "http://cran.fhcrc.org"))
 ```
 
 Alternatively, configure your default repo's in your `~/.Rprofile` like so:
 
 ``` r
-options(repos=c("https://sage-bionetworks.github.io/ran", "https://cran.cnr.berkeley.edu/"))
+options(repos=c("https://sage-bionetworks.github.io/ran", "http://cran.fhcrc.org"))
 ```
 
 after which you may run install.packages without specifying the repositories:
 
 ``` r
 install.packages("synapser")
+library(synapser)
+synLogin()
+```
+
+If you have been asked to validate a release candidate, please replace the URL <https://sage-bionetworks.github.io/ran> with <https://sage-bionetworks.github.io/staging-ran>, that is:
+
+``` r
+install.packages("synapser", repos=c("https://sage-bionetworks.github.io/staging-ran", "http://cran.fhcrc.org"))
 ```
 
 Usage
