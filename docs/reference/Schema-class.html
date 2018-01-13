@@ -6,7 +6,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Schema-class — Schema-class • synapser</title>
+<title>Schema — Schema-class • synapser</title>
 
 <!-- jquery -->
 <script src="https://code.jquery.com/jquery-3.1.0.min.js" integrity="sha384-nrOSfDHtoPMzJHjVTdCopGqIqeYETSXhZDFyniQ8ZHcVy08QesyHcnOUpMpqnmWq" crossorigin="anonymous"></script>
@@ -96,16 +96,11 @@
       <div class="row">
   <div class="col-md-9 contents">
     <div class="page-header">
-    <h1>Schema-class</h1>
+    <h1>Schema</h1>
     </div>
 
     
-    <p>A Schema is a :py:class:`synapse.entity.Entity` that defines a set of columns in a table.</p>
-
-    <p>name: give the Table Schema object a name</p>
-<p>description:</p>
-<p>columns: a list of :py:class:`Column` objects or their IDs</p>
-<p>parent: the project (file a bug if you'd like folders supported) in Synapse to which this table belongs</p>
+    <p>A Schema is an Entity that defines a set of columns in a table.</p>
     
 
         
@@ -116,21 +111,7 @@
     <h2 class="hasAnchor" id="methods"><a class="anchor" href="#methods"></a>Methods</h2>
 
     <ul>
-<li><p><code><a href='Schema.html'>Schema(name=NULL, columns=NULL, parent=NULL, properties=NULL, annotations=NULL, local_state=NULL, ...)</a></code>: A Schema is a :py:class:`synapse.entity.Entity` that defines a set of columns in a table.</p>
-<p>:param name: give the Table Schema object a name
-:param description:
-:param columns: a list of :py:class:`Column` objects or their IDs
-:param parent: the project (file a bug if you'd like folders supported) in Synapse to which this table belongs</p>
-<p>::</p>
-<p>cols = [Column(name='Isotope', columnType='STRING'),
-            Column(name='Atomic Mass', columnType='INTEGER'),
-            Column(name='Halflife', columnType='DOUBLE'),
-            Column(name='Discovered', columnType='DATE')]</p>
-<p>schema = syn.store(Schema(name='MyTable', columns=cols, parent=project))</p></li>
-<li><p><code>addColumn(column)</code>: :param column: a column object or its ID</p></li>
-<li><p><code>addColumns(columns)</code>: :param columns: a list of column objects or their ID</p></li>
-<li><p><code>has_columns()</code>: Does this schema have columns specified?</p></li>
-<li><p><code>removeColumn(column)</code>: :param column: a column object or its ID</p></li>
+<li></li>
 </ul>
     
 
@@ -153,7 +134,7 @@
 </div>
 
 <div class="pkgdown">
-  <p>Site built with <a href="http://hadley.github.io/pkgdown/">pkgdown</a>.</p>
+  <p>Site built with <a href="http://pkgdown.r-lib.org/">pkgdown</a>.</p>
 </div>
 
       </footer>
